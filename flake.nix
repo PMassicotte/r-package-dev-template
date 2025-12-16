@@ -32,13 +32,12 @@
     in
     {
       overlays.default = final: prev: rec {
-        # Define your package's runtime dependencies once (from DESCRIPTION Imports:)
-        # Uncomment and add your dependencies here to avoid duplication
-        # myPackageRuntimeDeps = with final.rPackages; [
-        #   stringr
-        #   dplyr
-        #   # ... other packages from DESCRIPTION Imports:
-        # ];
+        # Define your package's runtime dependencies (from DESCRIPTION Imports:)
+        # Replace 'cli' with your actual package dependencies
+        rPackageDeps = with final.rPackages; [
+          cli
+          # Add more packages from your DESCRIPTION Imports: section here
+        ];
 
         # Build nvimcom manually from R.nvim source
         nvimcom = final.rPackages.buildRPackage {
@@ -67,72 +66,41 @@
         #   src = ./.;
         #
         #   # Reuse the runtime dependencies defined above
-        #   propagatedBuildInputs = myPackageRuntimeDeps;
+        #   propagatedBuildInputs = rPackageDeps;
         # };
 
-        # Define R packages for the development environment
+        # R packages for the development environment
+        # Add packages from your DESCRIPTION file to rPackageDeps above
         rPackageList = (
           with final.rPackages;
           [
-            # ============================================================
-            # CORE DEVELOPMENT TOOLS
-            # These are essential for R package development and testing
-            # ============================================================
-            devtools # Package development tools (load_all, document, etc.)
-            roxygen2 # Documentation generation from code comments
-            testthat # Unit testing framework
-            usethis # Workflow automation for package development
-            pkgdown # Generate package website
-            rcmdcheck # Run R CMD check from R
+            # Core package development tools
+            devtools
+            roxygen2
+            testthat
+            usethis
+            pkgdown
+            rcmdcheck
 
-            # ============================================================
-            # EDITOR/IDE INTEGRATION
-            # Required for R.nvim, LSP, and interactive development
-            # ============================================================
-            languageserver # LSP server for code completion and diagnostics
-            nvimcom # R.nvim communication package
-            httpgd # Modern graphics device for web-based plotting
-            lintr # Static code analysis and linting
+            # Editor integration (for Neovim/LSP support)
+            languageserver
+            nvimcom
+            httpgd
+            lintr
 
-            # ============================================================
-            # VIGNETTES AND DOCUMENTATION
-            # Add these if your package has vignettes (from DESCRIPTION Suggests)
-            # ============================================================
+            # Additional utilities
+            fs
+
+            # Uncomment if your package has vignettes
             # knitr
             # rmarkdown
             # quarto
 
-            # ============================================================
-            # SUGGESTED PACKAGES (OPTIONAL)
-            # Add packages from your DESCRIPTION file's "Suggests:" section
-            # These are only needed for examples, tests, or vignettes
-            # ============================================================
-            # Example from eemR:
-            # ggplot2
-            # plot3D
-            # testthat
-            # knitr
-            # rmarkdown
-            # tidyr
-            # shiny
-            # DT
-            # MBA
-            # covr
-
-            # ============================================================
-            # ADDITIONAL DEV-ONLY TOOLS
-            # Packages that help with development but aren't in DESCRIPTION
-            # ============================================================
-            cli # Modern CLI interfaces
-            fs # File system operations
-            # cyclocomp   # Code complexity analysis
-            # covr        # Test coverage
-            # spelling    # Spell checking for documentation
+            # Add suggested packages from your DESCRIPTION file here
+            # Example: ggplot2, tidyr, etc.
           ]
-        )
-        # Uncomment the line below when you've defined myPackageRuntimeDeps above
-        # ++ myPackageRuntimeDeps
-        ;
+          ++ rPackageDeps
+        );
 
         # Create rWrapper with packages (for LSP and R.nvim)
         baseWrappedR = final.rWrapper.override { packages = rPackageList; };
