@@ -1,0 +1,14 @@
+# Nix
+.direnv/
+result
+
+# R
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# Package development
+/doc/
+/Meta/
