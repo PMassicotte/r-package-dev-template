@@ -50,6 +50,7 @@
             R
             gcc
             gnumake
+            qpdf
           ];
 
           meta = {
@@ -134,10 +135,34 @@
         ;
 
         # Create rWrapper with packages (for LSP and R.nvim)
-        wrappedR = final.rWrapper.override { packages = rPackageList; };
+        baseWrappedR = final.rWrapper.override { packages = rPackageList; };
+
+        # Wrap R with R_QPDF environment variable
+        wrappedR = final.symlinkJoin {
+          name = "wrapped-r-with-qpdf";
+          paths = [ baseWrappedR ];
+          buildInputs = [ final.makeWrapper ];
+          postBuild = ''
+            wrapProgram $out/bin/R \
+              --set R_QPDF "${final.qpdf}/bin/qpdf"
+            wrapProgram $out/bin/Rscript \
+              --set R_QPDF "${final.qpdf}/bin/qpdf"
+          '';
+        };
 
         # Create radianWrapper with same packages (for interactive use)
-        wrappedRadian = final.radianWrapper.override { packages = rPackageList; };
+        baseWrappedRadian = final.radianWrapper.override { packages = rPackageList; };
+
+        # Wrap radian with R_QPDF environment variable
+        wrappedRadian = final.symlinkJoin {
+          name = "wrapped-radian-with-qpdf";
+          paths = [ baseWrappedRadian ];
+          buildInputs = [ final.makeWrapper ];
+          postBuild = ''
+            wrapProgram $out/bin/radian \
+              --set R_QPDF "${final.qpdf}/bin/qpdf"
+          '';
+        };
       };
 
       devShells = forEachSupportedSystem (
@@ -147,6 +172,7 @@
             packages = with pkgs; [
               wrappedR # R with packages for LSP
               wrappedRadian # radian with packages for interactive use
+              qpdf # PDF compression checks
 
               # Additional system tools for package development
               # git           # Version control
@@ -155,6 +181,9 @@
             ];
 
             shellHook = ''
+              # Set R_QPDF environment variable for R CMD check
+              export R_QPDF="${pkgs.qpdf}/bin/qpdf"
+
               echo "🔧 R Package Development Environment"
               echo ""
               echo "Quick commands:"
