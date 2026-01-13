@@ -32,12 +32,27 @@
     in
     {
       overlays.default = final: prev: rec {
-        # Define your package's runtime dependencies (from DESCRIPTION Imports:)
+        # ==============================================================================
+        # SECTION 1: YOUR PACKAGE'S DEPENDENCIES (from DESCRIPTION file)
+        # ==============================================================================
+        # These are the packages YOUR package needs to run (Imports field)
         # Replace 'cli' with your actual package dependencies
-        rPackageDeps = with final.rPackages; [
+        runtimeDeps = with final.rPackages; [
           cli
           # Add more packages from your DESCRIPTION Imports: section here
+          # Example: httr, jsonlite, dplyr, etc.
         ];
+
+        # If you need packages from GitHub (not on CRAN), add them here
+        # You'll need to define inputs at the top and build them in Section 2
+        githubDataDeps = [
+          # Example: myGithubPackage
+        ];
+
+        # ==============================================================================
+        # SECTION 2: BUILD SPECIAL PACKAGES (from GitHub, not from CRAN)
+        # ==============================================================================
+        # These packages aren't on CRAN, so we build them from source
 
         # Build nvimcom manually from R.nvim source
         nvimcom = final.rPackages.buildRPackage {
@@ -59,51 +74,88 @@
           };
         };
 
-        # Build your R package
+        # Add custom GitHub package builds here
+        # There are two patterns you can use:
+
+        # PATTERN A: Using flake inputs (preferred - rev/sha locked in flake.lock)
+        # 1. Add to inputs at top of file:
+        #    inputs.myGithubPackage = { url = "github:owner/repo"; flake = false; };
+        # 2. Build it here:
+        # myGithubPackage = final.rPackages.buildRPackage {
+        #   name = "myGithubPackage";
+        #   src = inputs.myGithubPackage;
+        #   propagatedBuildInputs = with final.rPackages; [ dependency1 dependency2 ];
+        # };
+
+        # PATTERN B: Using fetchFromGitHub (rev/sha specified here)
+        # myGithubPackage = final.rPackages.buildRPackage {
+        #   name = "myGithubPackage";
+        #   src = final.fetchFromGitHub {
+        #     owner = "owner";
+        #     repo = "repo";
+        #     rev = "commit-hash";
+        #     sha256 = "sha256-...";
+        #   };
+        #   propagatedBuildInputs = with final.rPackages; [ dependency1 dependency2 ];
+        # };
+
+        # ==============================================================================
+        # SECTION 3: BUILD YOUR PACKAGE
+        # ==============================================================================
         # Uncomment and customize this section when you're ready to build your package
         # myRPackage = final.rPackages.buildRPackage {
         #   name = "myRPackage";
         #   src = ./.;
-        #
-        #   # Reuse the runtime dependencies defined above
-        #   propagatedBuildInputs = rPackageDeps;
+        #   # Give it the runtime dependencies from Section 1
+        #   propagatedBuildInputs = runtimeDeps ++ githubDataDeps;
         # };
 
-        # R packages for the development environment
-        # Add packages from your DESCRIPTION file to rPackageDeps above
-        rPackageList = (
-          with final.rPackages;
-          [
-            # Core package development tools
-            devtools
-            roxygen2
-            testthat
-            usethis
-            pkgdown
-            rcmdcheck
+        # ==============================================================================
+        # SECTION 4: DEVELOPMENT ENVIRONMENT PACKAGES
+        # ==============================================================================
+        # All the packages you want available when developing
+        # This is SEPARATE from your package's runtime dependencies!
 
-            # Editor integration (for Neovim/LSP support)
-            languageserver
-            nvimcom
-            httpgd
-            lintr
+        devPackages = with final.rPackages; [
+          # Development tools
+          devtools
+          roxygen2
+          testthat
+          usethis
+          pkgdown
+          rcmdcheck
+          pak
+          urlchecker
 
-            # Additional utilities
-            fs
+          # Editor support (nvim, LSP, etc.)
+          languageserver
+          nvimcom
+          httpgd
+          lintr
+          cyclocomp
 
-            # Uncomment if your package has vignettes
-            # knitr
-            # rmarkdown
-            # quarto
+          # Useful utilities
+          tibble
+          cli
+          fs
 
-            # Add suggested packages from your DESCRIPTION file here
-            # Example: ggplot2, tidyr, etc.
-          ]
-          ++ rPackageDeps
-        );
+          # Uncomment if your package has vignettes
+          # knitr
+          # rmarkdown
 
+          # Add suggested packages from your DESCRIPTION Suggests: section here
+          # Example: ggplot2, tidyr, dplyr, etc.
+        ];
+
+        # Combine: your package's dependencies + development tools
+        # This is what goes into your R environment
+        allPackages = runtimeDeps ++ githubDataDeps ++ devPackages;
+
+        # ==============================================================================
+        # SECTION 5: WRAP R AND RADIAN WITH ALL PACKAGES
+        # ==============================================================================
         # Create rWrapper with packages (for LSP and R.nvim)
-        baseWrappedR = final.rWrapper.override { packages = rPackageList; };
+        baseWrappedR = final.rWrapper.override { packages = allPackages; };
 
         # Wrap R with R_QPDF environment variable
         wrappedR = final.symlinkJoin {
@@ -119,7 +171,7 @@
         };
 
         # Create radianWrapper with same packages (for interactive use)
-        baseWrappedRadian = final.radianWrapper.override { packages = rPackageList; };
+        baseWrappedRadian = final.radianWrapper.override { packages = allPackages; };
 
         # Wrap radian with R_QPDF environment variable
         wrappedRadian = final.symlinkJoin {
@@ -146,6 +198,13 @@
               # git           # Version control
               # pandoc        # Document conversion (for vignettes)
               # quarto        # Modern publishing system
+              # html-tidy     # HTML validation for R CMD check
+              # (texlive.combine {
+              #   inherit (texlive)
+              #     scheme-small
+              #     inconsolata # Required for PDF manual generation
+              #     ;
+              # })
             ];
 
             shellHook = ''
@@ -175,16 +234,16 @@
             # R Package Development Template
 
             ## Getting started
-            1. Edit flake.nix and uncomment the sections you need
-            2. Add your DESCRIPTION Imports to propagatedBuildInputs
-            3. Add your DESCRIPTION Suggests to rPackageList
+            1. Edit flake.nix Section 1: Add your DESCRIPTION Imports to runtimeDeps
+            2. Edit flake.nix Section 4: Add your DESCRIPTION Suggests to devPackages
+            3. Uncomment Section 3 to build your package
             4. Run `direnv allow` (if using direnv) or `nix develop`
 
             ## What's included
-            - R with devtools, roxygen2, testthat, and usethis
+            - R with devtools, roxygen2, testthat, usethis, pak, and pkgdown
             - languageserver and nvimcom for editor integration
             - radian (modern R console)
-            - Helpful comments showing where to add dependencies
+            - Clear 5-section structure with helpful comments
           '';
         };
       };
